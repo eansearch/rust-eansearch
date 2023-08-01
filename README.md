@@ -43,5 +43,6 @@ let img = eansearch.barcode_image(5099750442227, None, None);
 
 ```
 
-To use the library, you need an account obtain optain an API token.
+To use the library, you need an account and obtain an API token.
+
 See [https://www.ean-search.org/ean-database-api.html](https://www.ean-search.org/ean-database-api.html)
