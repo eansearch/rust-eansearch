@@ -19,7 +19,7 @@ let product = product.unwrap();
 println!("EAN {} is {}", product.ean, product.name);
 
 // now find all products with the keyword 'bananaboat'
-let product_list = eansearch.product_search(search_term, Some(1), None);
+let product_list = eansearch.product_search("bananaboat", Some(1), None);
 for p in &product_list.unwrap() {
 	println!("EAN {:0>13} is {} ({})", p.ean, p.name, p.category_name);
 }
