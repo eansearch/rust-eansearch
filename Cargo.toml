@@ -1,0 +1,28 @@
+[package]
+name = "eansearch"
+version = "1.0.0"
+edition = "2021"
+authors = ["Relaxed Communications GmbH <info@relaxedcommunications.com>"]
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["ean", "gtin", "upc", "barcode", "lookup", "search", "validation"]
+repository = "https://github.com/eansearch/rust-eansearch/"
+description = """
+Search the EAN barcode database at Ean-Search.org
+
+Search for products by EAN number or product name, verify barcodes or generate barcode images.
+"""
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+]
+[dependencies]
+reqwest = { version = "0.11.17", features = ["blocking"] }
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_derive = "1.0"
+serde_with = "1.0"
+engine = "0.0.0"
+base64 = "0.21.2"
