@@ -332,7 +332,7 @@ mod tests {
     fn test_product_search_not_found() {
         let token = env::var("EAN_SEARCH_API_TOKEN").expect("EAN_SEARCH_API_TOKEN not set");
         let eansearch = EANSearch::new(&token);
-        let search_term = "the"; // stop word, no results
+        let search_term = "WordNever2BFound"; // stop word, no results
         let product_list = eansearch.product_search(search_term, Some(1), None);
         assert!(product_list.is_ok());
         assert!(product_list.as_ref().unwrap().is_empty());
