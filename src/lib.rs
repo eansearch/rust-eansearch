@@ -72,7 +72,7 @@ struct AccountStatus {
 }
 
 #[serde_as]
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 struct APIError {
     error: String,
@@ -86,8 +86,8 @@ pub struct EANSearch {
 impl EANSearch {
     /// Construct the database access object with your API token
     pub fn new(token: &str) -> Self {
-        let url = String::from("https://api.ean-search.org/api?format=json&token=") + &token;
-        Self { base_url: url }
+        let base_url = String::from("https://api.ean-search.org/api?format=json&token=") + &token;
+        Self { base_url }
     }
 
     /// Search for a product by EAN barcode
@@ -122,11 +122,14 @@ impl EANSearch {
             + "&page=" + &page.unwrap_or(0).to_string()
             + "&language=" + &language.unwrap_or(1).to_string();
         let body = reqwest::blocking::get(url)?.text()?;
+        let api_error : Result<Vec<APIError>, serde_json::Error> = serde_json::from_str(&body);
+        if api_error.is_ok() {
+            return Err(api_error.unwrap()[0].error.clone().into()); // API error
+        }
         let json : Value = serde_json::from_str(&body)?;
         let pl = &json["productlist"];
         let json_list = serde_json::to_string(pl);
         let result : Vec<Product> = serde_json::from_str(&json_list.unwrap())?;
-        // TODO: catch API error
         // TODO: signal total list size?
         Ok(result)
     }
@@ -138,11 +141,14 @@ impl EANSearch {
             + "&language=" + &language.unwrap_or(99).to_string()
             + "&page=" + &page.unwrap_or(0).to_string();
         let body = reqwest::blocking::get(url)?.text()?;
+        let api_error : Result<Vec<APIError>, serde_json::Error> = serde_json::from_str(&body);
+        if api_error.is_ok() {
+            return Err(api_error.unwrap()[0].error.clone().into()); // API error
+        }
         let json : Value = serde_json::from_str(&body)?;
         let pl = &json["productlist"];
         let json_list = serde_json::to_string(pl);
         let result : Vec<Product> = serde_json::from_str(&json_list.unwrap())?;
-        // TODO: catch API error
         // TODO: signal total list size?
         Ok(result)
     }
@@ -157,11 +163,14 @@ impl EANSearch {
         url = url + "&language=" + &language.unwrap_or(99).to_string()
             + "&page=" + &page.unwrap_or(0).to_string();
         let body = reqwest::blocking::get(url)?.text()?;
+        let api_error : Result<Vec<APIError>, serde_json::Error> = serde_json::from_str(&body);
+        if api_error.is_ok() {
+            return Err(api_error.unwrap()[0].error.clone().into()); // API error
+        }
         let json : Value = serde_json::from_str(&body)?;
         let pl = &json["productlist"];
         let json_list = serde_json::to_string(pl);
         let result : Vec<Product> = serde_json::from_str(&json_list.unwrap())?;
-        // TODO: catch API error
         // TODO: signal total list size?
         Ok(result)
     }
@@ -319,8 +328,7 @@ mod tests {
     fn test_product_search() {
         let token = env::var("EAN_SEARCH_API_TOKEN").expect("EAN_SEARCH_API_TOKEN not set");
         let eansearch = EANSearch::new(&token);
-        let search_term = "bananaboat";
-        let product_list = eansearch.product_search(search_term, Some(1), None);
+        let product_list = eansearch.product_search("bananaboat", Some(1), None);
         assert!(product_list.is_ok());
         assert!(!product_list.as_ref().unwrap().is_empty());
         for p in &product_list.unwrap() {
@@ -332,10 +340,21 @@ mod tests {
     fn test_product_search_not_found() {
         let token = env::var("EAN_SEARCH_API_TOKEN").expect("EAN_SEARCH_API_TOKEN not set");
         let eansearch = EANSearch::new(&token);
-        let search_term = "WordNever2BFound"; // stop word, no results
-        let product_list = eansearch.product_search(search_term, Some(1), None);
+        let product_list = eansearch.product_search("WordNever2BFound", Some(1), None);
         assert!(product_list.is_ok());
         assert!(product_list.as_ref().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_product_search_api_error() {
+        let eansearch = EANSearch::new("xxx"); // invalid token
+        let product_list = eansearch.product_search("bananaboat", Some(1), None);
+        if product_list.is_err() {
+            println!("Error = {:?}", product_list.as_ref().err())
+        }
+        assert!(product_list.is_err());
+        let msg = format!("{:?}", product_list.as_ref().err());
+        assert!(msg == "Some(\"Invalid token\")");
     }
 
     #[test]

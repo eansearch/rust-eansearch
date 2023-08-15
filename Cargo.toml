@@ -1,6 +1,6 @@
 [package]
 name = "eansearch"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 authors = ["Relaxed Communications GmbH <info@relaxedcommunications.com>"]
 readme = "README.md"
@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["ean", "gtin", "upc", "barcode", "validation"]
 repository = "https://github.com/eansearch/rust-eansearch/"
 description = """
-Search the EAN barcode database at Ean-Search.org
+Search the EAN barcode database at Ean-Search.org.
 
 Search for products by EAN number or product name, verify barcodes or generate barcode images.
 """
