@@ -4,7 +4,7 @@
 //!
 //! A library to search the EAN barcode database at [EAN-Search.org](https://www.ean-search.org)
 //!
-//! (c) 2023 Relaxed Communications GmbH <info@relaxedcommunications.com>
+//! (c) 2024 Relaxed Communications GmbH <info@relaxedcommunications.com>
 //!
 //! See [https://www.ean-search.org/ean-database-api.html](https://www.ean-search.org/ean-database-api.html)
 
@@ -95,6 +95,30 @@ impl EANSearch {
         let url : String = self.base_url.to_owned()
             + "&op=barcode-lookup&ean=" + &ean.to_string()
             + "&language=" + &language.unwrap_or(1).to_string();
+        let body = reqwest::blocking::get(url)?.text()?;
+        let json : Result<Option<Vec<Product>>, serde_json::Error> = serde_json::from_str(&body);
+        match json {
+            Ok(p) => Ok(Some(p.unwrap()[0].clone())), // EAN found
+            Err(_e) =>  {
+                let api_error : Result<Vec<APIError>, serde_json::Error> = serde_json::from_str(&body);
+                match api_error {
+                    Ok(e) => {
+                        if e[0].error == "Barcode not found" {
+                            Ok(None)    // Rust has a better way to represent EAN not found
+                        } else {
+                            Err(e[0].error.clone().into()) // API error
+                        }
+                    }
+                    Err(_e) => Err("Undefined API error".into())
+                }
+            },
+        }
+    }
+
+    /// Lookup a book by ISBN-10 or ISBN-13 code
+    pub fn isbn_lookup(&self, isbn: u64) -> Result<Option<Product>, Box<dyn Error>> {
+        let url : String = self.base_url.to_owned()
+            + "&op=barcode-lookup&isbn=" + &isbn.to_string();
         let body = reqwest::blocking::get(url)?.text()?;
         let json : Result<Option<Vec<Product>>, serde_json::Error> = serde_json::from_str(&body);
         match json {
@@ -302,6 +326,20 @@ mod tests {
     }
 
     #[test]
+    fn test_isbn_lookup() {
+        let token = env::var("EAN_SEARCH_API_TOKEN").expect("EAN_SEARCH_API_TOKEN not set");
+        let eansearch = EANSearch::new(&token);
+        let product = eansearch.isbn_lookup(1119578884);
+        assert!(product.is_ok()); // check if API call went through ok
+        let product = product.unwrap(); // extract from Result
+        assert!(product.is_some()); // check if a product was found
+        let product = product.unwrap();
+        assert!(product.name.contains("Linux"));
+        assert_eq!(product.category_id, 15);
+        assert_eq!(product.category_name, "Books and Magazines");
+    }
+
+    #[test]
     fn test_barcode_prefix_search() {
         let token = env::var("EAN_SEARCH_API_TOKEN").expect("EAN_SEARCH_API_TOKEN not set");
         let eansearch = EANSearch::new(&token);
@@ -361,8 +399,7 @@ mod tests {
     fn test_category_search() {
         let token = env::var("EAN_SEARCH_API_TOKEN").expect("EAN_SEARCH_API_TOKEN not set");
         let eansearch = EANSearch::new(&token);
-        let search_term = "bananaboat";
-        let product_list = eansearch.category_search(45, Some(search_term), Some(1), None);
+        let product_list = eansearch.category_search(45, Some("bananaboat"), Some(1), None);
         assert!(product_list.is_ok());
         assert!(!product_list.as_ref().unwrap().is_empty());
         for p in &product_list.unwrap() {

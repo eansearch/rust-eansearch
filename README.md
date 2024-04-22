@@ -5,6 +5,7 @@ Search for products by EAN barcode or product name / keywords
 ## Features
 
 * Search by EAN code
+* Lookup by ISBN code (ISBN-10 or ISBN-13)
 * Search by name or keyords
 * restrict search by product category
 * get the issuing country for the barcode
@@ -19,6 +20,13 @@ let product = eansearch.barcode_lookup(5099750442227, Some(1));
 let product = product.unwrap(); // unwrap result
 let product = product.unwrap();
 println!("EAN {} is {}", product.ean, product.name);
+
+// search by ISBN code
+let eansearch = EANSearch::new(&token);
+let book = eansearch.isbn_lookup(1119578884);
+let book = book.unwrap(); // unwrap result
+let book = book.unwrap();
+println!("ISBN-13 {} is {}", book.ean, book.name);
 
 // now find all products with the keyword 'bananaboat'
 let product_list = eansearch.product_search("bananaboat", Some(1), None);
