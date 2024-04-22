@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Relaxed Communications GmbH <info@relaxedcommunications.com>"]
 readme = "README.md"
 license = "MIT OR Apache-2.0"
-keywords = ["ean", "gtin", "upc", "barcode", "validation", "isbn", "isbn-10", "isbn-13"]
+keywords = ["ean", "gtin", "upc", "barcode", "validation"]
 repository = "https://github.com/eansearch/rust-eansearch/"
 description = """
 Search the EAN barcode database at Ean-Search.org.
