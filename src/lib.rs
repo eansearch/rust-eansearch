@@ -8,7 +8,7 @@
 //!
 //! See [https://www.ean-search.org/ean-database-api.html](https://www.ean-search.org/ean-database-api.html)
 
-use std::fmt;
+use std::{fmt, thread, time};
 use std::error::Error;
 use serde::Deserialize;
 use serde_with::{DisplayFromStr, serde_as};
@@ -142,6 +142,7 @@ impl EANSearch {
     fn api_call_list(&self, url: &String, tries: i32) -> Result<Vec<Product>, Box<dyn Error>> {
         let resp = reqwest::blocking::get(url)?;
 		if resp.status() == 429 {
+			thread::sleep(time::Duration::new(0, 1)); // wait 1 sec
 			return self.api_call_list(&url, tries + 1)
 		}
         let body = resp.text()?;
