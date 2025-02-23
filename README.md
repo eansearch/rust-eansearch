@@ -28,8 +28,14 @@ let book = book.unwrap(); // unwrap result
 let book = book.unwrap();
 println!("ISBN-13 {} is {}", book.ean, book.name);
 
-// now find all products with the keyword 'bananaboat'
+// find all products with the keyword 'bananaboat'
 let product_list = eansearch.product_search("bananaboat", Some(1), None);
+for p in &product_list.unwrap() {
+	println!("EAN {:0>13} is {} ({})", p.ean, p.name, p.category_name);
+}
+
+// find products matching some keywords, but maybe not all
+let product_list = eansearch.similar_product_search("bananaboat WordNever2BFound", Some(1), None);
 for p in &product_list.unwrap() {
 	println!("EAN {:0>13} is {} ({})", p.ean, p.name, p.category_name);
 }

@@ -4,7 +4,7 @@
 //!
 //! A library to search the EAN barcode database at [EAN-Search.org](https://www.ean-search.org)
 //!
-//! (c) 2024 Relaxed Communications GmbH <info@relaxedcommunications.com>
+//! (c) 2025 Relaxed Communications GmbH <info@relaxedcommunications.com>
 //!
 //! See [https://www.ean-search.org/ean-database-api.html](https://www.ean-search.org/ean-database-api.html)
 
@@ -139,13 +139,12 @@ impl EANSearch {
         }
     }
 
-    /// Search for all products with an EAN barcode staring with this prefix
-    pub fn barcode_prefix_search(&self, prefix: u64, language: Option<i8>, page: Option<i32>) -> Result<Vec<Product>, Box<dyn Error>> {
-        let url : String = self.base_url.to_owned()
-            + "&op=barcode-prefix-search&prefix=" + &prefix.to_string()
-            + "&page=" + &page.unwrap_or(0).to_string()
-            + "&language=" + &language.unwrap_or(1).to_string();
-        let body = reqwest::blocking::get(url)?.text()?;
+    fn api_call_list(&self, url: &String, tries: i32) -> Result<Vec<Product>, Box<dyn Error>> {
+        let resp = reqwest::blocking::get(url)?;
+		if resp.status() == 429 {
+			return self.api_call_list(&url, tries + 1)
+		}
+        let body = resp.text()?;
         let api_error : Result<Vec<APIError>, serde_json::Error> = serde_json::from_str(&body);
         if api_error.is_ok() {
             return Err(api_error.unwrap()[0].error.clone().into()); // API error
@@ -158,23 +157,31 @@ impl EANSearch {
         Ok(result)
     }
 
+    /// Search for all products with an EAN barcode staring with this prefix
+    pub fn barcode_prefix_search(&self, prefix: u64, language: Option<i8>, page: Option<i32>) -> Result<Vec<Product>, Box<dyn Error>> {
+        let url : String = self.base_url.to_owned()
+            + "&op=barcode-prefix-search&prefix=" + &prefix.to_string()
+            + "&page=" + &page.unwrap_or(0).to_string()
+            + "&language=" + &language.unwrap_or(1).to_string();
+		self.api_call_list(&url, 1)
+    }
+
     /// Search for all products matching all keywords in name parameter
     pub fn product_search(&self, name: &str, language: Option<i8>, page: Option<i32>) -> Result<Vec<Product>, Box<dyn Error>> {
         let url : String = self.base_url.to_owned()
             + "&op=product-search&name=" + name
             + "&language=" + &language.unwrap_or(99).to_string()
             + "&page=" + &page.unwrap_or(0).to_string();
-        let body = reqwest::blocking::get(url)?.text()?;
-        let api_error : Result<Vec<APIError>, serde_json::Error> = serde_json::from_str(&body);
-        if api_error.is_ok() {
-            return Err(api_error.unwrap()[0].error.clone().into()); // API error
-        }
-        let json : Value = serde_json::from_str(&body)?;
-        let pl = &json["productlist"];
-        let json_list = serde_json::to_string(pl);
-        let result : Vec<Product> = serde_json::from_str(&json_list.unwrap())?;
-        // TODO: signal total list size?
-        Ok(result)
+		self.api_call_list(&url, 1)
+    }
+
+    /// Search for products with similar keywords
+    pub fn similar_product_search(&self, name: &str, language: Option<i8>, page: Option<i32>) -> Result<Vec<Product>, Box<dyn Error>> {
+        let url : String = self.base_url.to_owned()
+            + "&op=similar-product-search&name=" + name
+            + "&language=" + &language.unwrap_or(99).to_string()
+            + "&page=" + &page.unwrap_or(0).to_string();
+		self.api_call_list(&url, 1)
     }
 
     /// Search for all products in a product catgory, optionally restricted by keywords in the name parameter
@@ -186,17 +193,7 @@ impl EANSearch {
         };
         url = url + "&language=" + &language.unwrap_or(99).to_string()
             + "&page=" + &page.unwrap_or(0).to_string();
-        let body = reqwest::blocking::get(url)?.text()?;
-        let api_error : Result<Vec<APIError>, serde_json::Error> = serde_json::from_str(&body);
-        if api_error.is_ok() {
-            return Err(api_error.unwrap()[0].error.clone().into()); // API error
-        }
-        let json : Value = serde_json::from_str(&body)?;
-        let pl = &json["productlist"];
-        let json_list = serde_json::to_string(pl);
-        let result : Vec<Product> = serde_json::from_str(&json_list.unwrap())?;
-        // TODO: signal total list size?
-        Ok(result)
+		self.api_call_list(&url, 1)
     }
 
     /// Query the country that issued an EAN barcode (available, even if we don't have specific in formation on the product)
@@ -355,7 +352,7 @@ mod tests {
     fn test_barcode_prefix_search_too_short() {
         let token = env::var("EAN_SEARCH_API_TOKEN").expect("EAN_SEARCH_API_TOKEN not set");
         let eansearch = EANSearch::new(&token);
-        let product_list = eansearch.barcode_prefix_search(50, Some(1), None);
+        let product_list = eansearch.barcode_prefix_search(5, Some(1), None);
         if product_list.is_err() {
             println!("Error = {:?}", product_list.as_ref().err())
         }
@@ -381,6 +378,18 @@ mod tests {
         let product_list = eansearch.product_search("WordNever2BFound", Some(1), None);
         assert!(product_list.is_ok());
         assert!(product_list.as_ref().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_similar_product_search_found() {
+        let token = env::var("EAN_SEARCH_API_TOKEN").expect("EAN_SEARCH_API_TOKEN not set");
+        let eansearch = EANSearch::new(&token);
+        let product_list = eansearch.similar_product_search("bananaboat WordNever2BFound", Some(1), None);
+        assert!(product_list.is_ok());
+        assert!(!product_list.as_ref().unwrap().is_empty());
+        for p in &product_list.unwrap() {
+            println!("Result: {:0>13} = {} ({})", p.ean, p.name, p.category_id);
+        }
     }
 
     #[test]
