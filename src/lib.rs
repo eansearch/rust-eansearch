@@ -35,6 +35,28 @@ impl std::fmt::Display for Product {
     }
 }
 
+/// A product returned from the EAN database (extended version)
+#[serde_as]
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtProduct {
+    #[serde_as(as = "DisplayFromStr")]
+    pub ean: u64,
+    pub name: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub category_id: i32,
+    pub category_name: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub google_category_id: i32,
+    pub issuing_country: String,
+}
+
+impl std::fmt::Display for ExtProduct {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "EAN {}: {} (category {}: {}, google category {}) from {}", self.ean, self.name, self.category_id, self.category_name, self.google_category_id, self.issuing_country)
+    }
+}
+
 #[serde_as]
 #[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -91,12 +113,12 @@ impl EANSearch {
     }
 
     /// Search for a product by EAN barcode
-    pub fn barcode_lookup(&self, ean: u64, language: Option<i8>) -> Result<Option<Product>, Box<dyn Error>> {
+    pub fn barcode_lookup(&self, ean: u64, language: Option<i8>) -> Result<Option<ExtProduct>, Box<dyn Error>> {
         let url : String = self.base_url.to_owned()
             + "&op=barcode-lookup&ean=" + &ean.to_string()
             + "&language=" + &language.unwrap_or(1).to_string();
         let body = reqwest::blocking::get(url)?.text()?;
-        let json : Result<Option<Vec<Product>>, serde_json::Error> = serde_json::from_str(&body);
+        let json : Result<Option<Vec<ExtProduct>>, serde_json::Error> = serde_json::from_str(&body);
         match json {
             Ok(p) => Ok(Some(p.unwrap()[0].clone())), // EAN found
             Err(_e) =>  {
@@ -116,11 +138,11 @@ impl EANSearch {
     }
 
     /// Lookup a book by ISBN-10 or ISBN-13 code
-    pub fn isbn_lookup(&self, isbn: u64) -> Result<Option<Product>, Box<dyn Error>> {
+    pub fn isbn_lookup(&self, isbn: u64) -> Result<Option<ExtProduct>, Box<dyn Error>> {
         let url : String = self.base_url.to_owned()
             + "&op=barcode-lookup&isbn=" + &isbn.to_string();
         let body = reqwest::blocking::get(url)?.text()?;
-        let json : Result<Option<Vec<Product>>, serde_json::Error> = serde_json::from_str(&body);
+        let json : Result<Option<Vec<ExtProduct>>, serde_json::Error> = serde_json::from_str(&body);
         match json {
             Ok(p) => Ok(Some(p.unwrap()[0].clone())), // EAN found
             Err(_e) =>  {
@@ -288,6 +310,7 @@ mod tests {
         assert!(product.name.contains("Thriller"));
         assert_eq!(product.category_id, 45);
         assert_eq!(product.category_name, "Music");
+        assert_eq!(product.google_category_id, 855);
         assert_eq!(product.issuing_country, "UK");
     }
 
@@ -335,6 +358,7 @@ mod tests {
         assert!(product.name.contains("Linux"));
         assert_eq!(product.category_id, 15);
         assert_eq!(product.category_name, "Books and Magazines");
+        assert_eq!(product.google_category_id, 784);
     }
 
     #[test]

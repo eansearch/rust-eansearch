@@ -19,7 +19,7 @@ let eansearch = EANSearch::new(&token);
 let product = eansearch.barcode_lookup(5099750442227, Some(1));
 let product = product.unwrap(); // unwrap result
 let product = product.unwrap();
-println!("EAN {} is {}", product.ean, product.name);
+println!("EAN {} is {} google category {}", product.ean, product.name, product.google_category_id);
 
 // search by ISBN code
 let eansearch = EANSearch::new(&token);
