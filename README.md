@@ -12,6 +12,12 @@ Search for products by EAN barcode or product name / keywords
 * verify barcode checksum
 * get PNG image for the EAN barcode
 
+## Installation
+
+```sh
+cargo add eansearch
+```
+
 ## How to use
 ```rust
 // search by EAN barcode, product name in English
