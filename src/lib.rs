@@ -4,13 +4,14 @@
 //!
 //! A library to search the EAN barcode database at [EAN-Search.org](https://www.ean-search.org)
 //!
-//! (c) 2025 Relaxed Communications GmbH <info@relaxedcommunications.com>
+//! (c) 2025-2026 Relaxed Communications GmbH <info@relaxedcommunications.com>
 //!
 //! See [https://www.ean-search.org/ean-database-api.html](https://www.ean-search.org/ean-database-api.html)
 
 use std::{fmt, thread, time};
 use std::error::Error;
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use serde_with::{DisplayFromStr, serde_as};
 use serde_json::Value;
 use base64::{Engine as _, engine::general_purpose};
@@ -64,6 +65,24 @@ struct ProductCountry {
     #[serde_as(as = "DisplayFromStr")]
     ean: u64,
     issuing_country: String,
+}
+
+#[serde_as]
+#[derive(Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct AsinLookup {
+    #[serde_as(as = "DisplayFromStr")]
+    ean: u64,
+    asin: String,
+}
+
+#[serde_as]
+#[derive(Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct LccnLookup {
+    #[serde_as(as = "DisplayFromStr")]
+    ean: u64,
+    lccn: String,
 }
 
 #[serde_as]
@@ -177,6 +196,28 @@ impl EANSearch {
         return Ok(resp.text()?);
 	}
 
+    /// Call the API and return the first entry of the result list (None if nothing was found)
+    fn api_call_first<T: DeserializeOwned>(&mut self, url: &String) -> Result<Option<T>, Box<dyn Error>> {
+        let body = self.api_call(url)?;
+        let json : Result<Vec<T>, serde_json::Error> = serde_json::from_str(&body);
+        match json {
+            Ok(mut l) => Ok(if l.is_empty() { None } else { Some(l.swap_remove(0)) }),
+            Err(_e) => {
+                let api_error : Result<Vec<APIError>, serde_json::Error> = serde_json::from_str(&body);
+                match api_error {
+                    Ok(e) => {
+                        if e[0].error.to_lowercase().contains("not found") {
+                            Ok(None)    // no match is not an error
+                        } else {
+                            Err(e[0].error.clone().into()) // API error
+                        }
+                    }
+                    Err(_e) => Err("Undefined API error".into()),
+                }
+            },
+        }
+    }
+
     fn api_call_list(&mut self, url: &String, tries: i32) -> Result<Vec<Product>, Box<dyn Error>> {
         let resp = self.client.get(url).send().unwrap();
 		if let Some(credits) = resp.headers().get("x-credits-remaining") {
@@ -198,6 +239,35 @@ impl EANSearch {
         let json_list = serde_json::to_string(pl);
         let result : Vec<Product> = serde_json::from_str(&json_list.unwrap())?;
         Ok(result)
+    }
+
+    /// Find the Amazon ASIN for an EAN / ISBN-13 barcode
+    pub fn find_asin_for_ean(&mut self, ean: u64) -> Result<Option<String>, Box<dyn Error>> {
+        let url : String = self.base_url.to_owned()
+            + "&op=asin-for-ean-lookup&ean=" + &ean.to_string();
+        Ok(self.api_call_first::<AsinLookup>(&url)?.map(|r| r.asin))
+    }
+
+    /// Find the EAN barcode for an Amazon ASIN
+    pub fn find_ean_for_asin(&mut self, asin: &str) -> Result<Option<u64>, Box<dyn Error>> {
+        let url : String = self.base_url.to_owned()
+            + "&op=ean-for-asin-lookup&asin=" + asin;
+        Ok(self.api_call_first::<AsinLookup>(&url)?.map(|r| r.ean))
+    }
+
+    /// Find the Library of Congress Control Number (LCCN) for an EAN / ISBN-13 barcode
+    pub fn find_lccn_for_ean(&mut self, ean: u64) -> Result<Option<String>, Box<dyn Error>> {
+        let url : String = self.base_url.to_owned()
+            + "&op=lccn-for-ean-lookup&ean=" + &ean.to_string();
+        Ok(self.api_call_first::<LccnLookup>(&url)?.map(|r| r.lccn))
+    }
+
+    /// Find the EAN barcode for a Library of Congress Control Number (LCCN).
+    /// Note that there can be multiple EANs for one LCCN, this returns the first one found.
+    pub fn find_ean_for_lccn(&mut self, lccn: &str) -> Result<Option<u64>, Box<dyn Error>> {
+        let url : String = self.base_url.to_owned()
+            + "&op=ean-for-lccn-lookup&lccn=" + lccn;
+        Ok(self.api_call_first::<LccnLookup>(&url)?.map(|r| r.ean))
     }
 
     /// Search for all products with an EAN barcode staring with this prefix
@@ -374,6 +444,60 @@ mod tests {
         assert_eq!(product.category_id, 15);
         assert_eq!(product.category_name, "Books and Magazines");
         assert_eq!(product.google_category_id, 784);
+    }
+
+    #[test]
+    fn test_find_asin_for_ean() {
+        let token = env::var("EAN_SEARCH_API_TOKEN").expect("EAN_SEARCH_API_TOKEN not set");
+        let mut eansearch = EANSearch::new(&token);
+        let asin = eansearch.find_asin_for_ean(9781119578888);
+        assert!(asin.is_ok());
+        if let Some(a) = asin.unwrap() {
+            assert_eq!(a.len(), 10); // ASINs are always 10 characters
+            let ean = eansearch.find_ean_for_asin(&a);
+            assert!(ean.is_ok());
+            assert!(ean.unwrap().is_some());
+        }
+    }
+
+    #[test]
+    fn test_find_asin_for_ean_not_found() {
+        let token = env::var("EAN_SEARCH_API_TOKEN").expect("EAN_SEARCH_API_TOKEN not set");
+        let mut eansearch = EANSearch::new(&token);
+        let asin = eansearch.find_asin_for_ean(4603300350552);
+        assert!(asin.is_ok());
+        assert!(asin.unwrap().is_none());
+    }
+
+    #[test]
+    fn test_find_ean_for_asin_api_error() {
+        let mut eansearch = EANSearch::new("xxx"); // invalid token
+        let ean = eansearch.find_ean_for_asin("B000000000");
+        assert!(ean.is_err());
+        let msg = format!("{:?}", ean.as_ref().err());
+        assert!(msg == "Some(\"Invalid token\")");
+    }
+
+    #[test]
+    fn test_find_lccn_for_ean() {
+        let token = env::var("EAN_SEARCH_API_TOKEN").expect("EAN_SEARCH_API_TOKEN not set");
+        let mut eansearch = EANSearch::new(&token);
+        let lccn = eansearch.find_lccn_for_ean(9781119578888);
+        assert!(lccn.is_ok());
+        if let Some(l) = lccn.unwrap() {
+            let ean = eansearch.find_ean_for_lccn(&l);
+            assert!(ean.is_ok());
+            assert!(ean.unwrap().is_some());
+        }
+    }
+
+    #[test]
+    fn test_find_ean_for_lccn_api_error() {
+        let mut eansearch = EANSearch::new("xxx"); // invalid token
+        let ean = eansearch.find_ean_for_lccn("2019000000");
+        assert!(ean.is_err());
+        let msg = format!("{:?}", ean.as_ref().err());
+        assert!(msg == "Some(\"Invalid token\")");
     }
 
     #[test]
