@@ -53,6 +53,14 @@ let product_list = eansearch.category_search(45, Some("bananaboat"), Some(1), No
 // download a EANs that start with 509975044xxx
 let product_list = eansearch.barcode_prefix_search(509975044, Some(1), None);
 
+// find the Amazon ASIN for a barcode, and the barcode for an ASIN
+let asin = eansearch.find_asin_for_ean(9781119578888);
+let ean = eansearch.find_ean_for_asin("1119578884");
+
+// find the Library of Congress control number (LCCN) for a barcode, and the barcode for an LCCN
+let lccn = eansearch.find_lccn_for_ean(9781119578888);
+let ean = eansearch.find_ean_for_lccn("2019000000");
+
 // find the country where a barcode was issued
 let country_lookup = eansearch.issuing_country(5099750442227);
 

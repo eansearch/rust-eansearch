@@ -225,8 +225,8 @@ impl EANSearch {
 		} else {
 			self.remaining = -1;
 		}
-		if resp.status() == 429 && tries <= MAX_API_TRIES {
-			thread::sleep(time::Duration::new(0, 1)); // wait 1 sec
+		if resp.status() == 429 && tries < MAX_API_TRIES {
+			thread::sleep(time::Duration::from_secs(1)); // wait 1 sec
 			return self.api_call_list(&url, tries + 1)
 		}
         let body = resp.text()?;
