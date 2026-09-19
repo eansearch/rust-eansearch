@@ -131,7 +131,9 @@ pub struct EANSearch {
 impl EANSearch {
     /// Construct the database access object with your API token
     pub fn new(token: &str) -> Self {
-		let client = reqwest::blocking::Client::builder().user_agent("rust-eansearch/1.0").build().unwrap();
+		let client = reqwest::blocking::Client::builder()
+			.user_agent(concat!("rust-eansearch/", env!("CARGO_PKG_VERSION")))
+			.build().unwrap();
         let base_url = String::from("https://api.ean-search.org/api?format=json&token=") + &token;
 		let remaining = -1;
         Self { client, base_url, remaining }
