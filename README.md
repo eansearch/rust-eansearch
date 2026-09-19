@@ -6,6 +6,7 @@ Search for products by EAN barcode or product name / keywords
 
 * Search by EAN code
 * Lookup by ISBN code (ISBN-10 or ISBN-13)
+* Lookup ASIN and LCCN numbers
 * Search by name or keyords
 * restrict search by product category
 * get the issuing country for the barcode
